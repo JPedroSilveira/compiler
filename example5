@@ -1,28 +1,16 @@
-int goodbye() {
-    int a;
-    a = 2;
-    return a;
+int z;
+int reflect(int a, int b, int c, int d, int e, int f) {
+    int z;
+    z = a + b + c + d + e + f;
+    return z;
 }
-int hello() {
-    int a;
-    int b;
-    int c;
-    a = 1;
-    b = 1;
-    c = 1;
-    return a + b + c;
-}
-int main(int a, int b, int c) {
+int main(int a) {
     int result;
-    int d;
-    a = hello();
-    b = hello();
-    c = goodbye();
-    d = 10;
-    if (a * b * c * d > 1000) then {
-        result = 1;
-    } else {
-        result = 2;
+    result = 0;
+    z = 4;
+    while (z != 0) {
+        result = result + reflect(1, 2, 3, 4, 5, 6);
+        z = z - 1;
     };
     return result;
 }

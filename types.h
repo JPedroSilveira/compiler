@@ -151,6 +151,8 @@ typedef enum IlocOperationType {
     OP_ERASE_RETURN,
     OP_CALL,
     OP_READ_RETURN,
+    OP_ADD_ARG_TO_CALL,
+    OP_READ_ARG_FROM_CALL,
     OP_NOP
 } IlocOperationType;
 

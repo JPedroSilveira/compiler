@@ -304,6 +304,16 @@ header: type function_name arguments {
     operationNop.rspSub =  symbolTableStack->lastPosition;
     addOperationToIlocList(operationList, operationNop);
 
+    FunctionArgument* argument = $3;
+    int argumentNumber = 1;
+    while(argument)
+    {
+        IlocOperation argOperation = generateUnaryOpWithOneOut(OP_READ_ARG_FROM_CALL, argumentNumber, argument->position);
+        addOperationToIlocList(operationList, argOperation);
+        argument = argument->nextArgument;
+        argumentNumber = argumentNumber + 1;
+    }
+    
     $$->operationList = operationList;
 };
 
@@ -318,7 +328,6 @@ body: command_block {
     $$ = $1;
 };
 
-// Lista de argumentos
 arguments: '(' ')' { 
     $$ = NULL;
 
@@ -424,7 +433,6 @@ simple_command: command_block ';' {
     symbolTableStack = createNewTableOnSymbolTableStack(symbolTableStack);
 };
 
-// Declaracao de variavel
 var_declaration: type var_decl_list { 
     $$ = $2;
 };
@@ -464,7 +472,6 @@ var_decl_list: TK_IDENTIFICADOR TK_OC_LE literal ',' var_decl_list {
     freeLexicalValue($4);
 };
 
-// Atribuicao
 attribution: TK_IDENTIFICADOR '=' expression {
     SymbolTableValue symbol = getByLexicalValueOnSymbolTableStack(symbolTableStack, $1);
     validateVariableUse(symbol, $1);
@@ -564,50 +571,31 @@ function_call: TK_IDENTIFICADOR '(' arg_fn_list ')' {
     freeLexicalValue($4);
 
     int r1 = generateRegister(globalVariableList);
-    int r2 = generateRegister(globalVariableList);
-    int r3 = generateRegister(globalVariableList);
-    int r4 = generateRegister(globalVariableList);
-    int r5 = generateRegister(globalVariableList);
-    int r6 = generateRegister(globalVariableList);
 
     IlocOperationList* operationList = createIlocListFromOtherList($3->node->operationList);
 
     int functionLabel = symbol.lexicalValue.functionLabel;
 
-    IlocOperation operationLoadRFPShift = generateUnaryOpWithOneOut(OP_LOADI, symbolTableStack->lastPosition, r4);
-    addOperationToIlocList(operationList, operationLoadRFPShift);
-
-    int address = 8;
     FunctionCallArgument* argument = $3;
+    int argumentNumber = 1;
     while(argument) {
-        argument = argument->nextArgument;
-        address += 4;
-    }
-    argument = $3;
-    while(argument) {
-        address -= 4;
-        IlocOperation argOperation = generateUnaryOpWithOneOut(OP_STOREAI_LOCAL, argument->value, address);
+        IlocOperation argOperation = generateUnaryOpWithOneOut(OP_ADD_ARG_TO_CALL, argument->value, argumentNumber);
         addOperationToIlocList(operationList, argOperation);
         argument = argument->nextArgument;
+        argumentNumber = argumentNumber + 1;
     }
 
-    IlocOperation operationLoadPCJump = generateUnaryOpWithOneOut(OP_LOADI, 5, r2);
-    addOperationToIlocList(operationList, operationLoadPCJump);
+    IlocOperation operationEraseReturn = generateUnaryOp(OP_ERASE_RETURN);
+    addOperationToIlocList(operationList, operationEraseReturn);
 
-    IlocOperation operationCalculateToReturnAddress = generateBinaryOpWithOneOut(OP_ADD, r1, r2, r3);
-    addOperationToIlocList(operationList, operationCalculateToReturnAddress);
+    IlocOperation operationCall = generateFunctionCall(symbol.lexicalValue.label);
+    addOperationToIlocList(operationList, operationCall);
 
-    IlocOperation operationStoreReturnAddress = generateUnaryOpWithOneOut(OP_STOREAI_LOCAL, r3, 0); 
-    addOperationToIlocList(operationList, operationStoreReturnAddress);
-
-    IlocOperation operationJumpToFunction = generateUnaryOpWithoutOut(OP_JUMPI, functionLabel);
-    addOperationToIlocList(operationList, operationJumpToFunction);
-
-    IlocOperation operationReadReturnValue = generateUnaryOpWithOneOut(OP_LOADAI_LOCAL, 4, r6);
+    IlocOperation operationReadReturnValue = generateUnaryOpWithoutInput(OP_READ_RETURN, r1);
     addOperationToIlocList(operationList, operationReadReturnValue);
 
     $$->operationList = operationList;
-    $$->outRegister = r6;
+    $$->outRegister = r1;
 };
 
 arg_fn_list: expression { 

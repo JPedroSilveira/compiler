@@ -1,16 +1,8 @@
-int b;
-int goodbye() {
-    int a;
-    a = 2;
-    return a;
-}
-int hello() {
-    int a;
-    a = goodbye();
+int reflect(int a, int b, int c, int d, int e, int f) {
     return a;
 }
 int main() {
-    int a;
-    a = hello() * goodbye() * 10;
-    return a;
+    int result;
+    result = reflect(1, 2, 3, 4, 5, 6);
+    return result;
 }

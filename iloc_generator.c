@@ -152,7 +152,27 @@ IlocOperation addLabelToOperation(IlocOperation operation, int label)
     return operation;
 }
 
-
+// Only supports functions with 6 arguments
+char* getArgumentRegister(int argumentNumber)
+{
+    switch (argumentNumber)
+    {
+        case 1:
+            return "%edi";
+        case 2:
+            return "%esi";
+        case 3:
+            return "%edx";
+        case 4:
+            return "%ecx";
+        case 5:
+            return "%r8d";
+        case 6:
+            return "%r9d";
+        default:
+            return "%edi";
+    }
+}
 
 void convertOperationWithLabel(IlocOperation operation) 
 {
@@ -290,6 +310,12 @@ void convertOperationToCode(IlocOperation operation)
             break;
         case OP_READ_RETURN:
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
+            break;
+        case OP_ADD_ARG_TO_CALL:
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", getArgumentRegister(operation.out1));
+            break;
+        case OP_READ_ARG_FROM_CALL:
+            printf("    movl    %s, -%d(%s) \n", getArgumentRegister(operation.op1), operation.out1, "%rbp");
             break;
         default:
             break;
