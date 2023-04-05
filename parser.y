@@ -707,11 +707,8 @@ flow_control_commands: TK_PR_IF '(' expression start_flow_control_block TK_PR_TH
     IlocOperation operationLoadFalse = generateUnaryOpWithOneOut(OP_LOADI, 0, rFalse);
     addOperationToIlocList(operationList, operationLoadFalse);
 
-    IlocOperation operationCmpFalse = generateBinaryOpWithOneOut(OP_CMP_NE, rExpression, rFalse, rCmpResult);
+    IlocOperation operationCmpFalse = generateBinaryOpWithOneOut(OP_CMP_NE, rExpression, rFalse, labelEnd);
     addOperationToIlocList(operationList, operationCmpFalse);
-
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, rCmpResult, labelTrue, labelEnd);
-    addOperationToIlocList(operationList, operationCbr);
 
     // IF TRUE
     IlocOperation operationNopTrue = generateNop();
@@ -747,11 +744,8 @@ flow_control_commands: TK_PR_IF '(' expression start_flow_control_block TK_PR_TH
     IlocOperation operationLoadFalse = generateUnaryOpWithOneOut(OP_LOADI, 0, rFalse);
     addOperationToIlocList(operationList, operationLoadFalse);
     
-    IlocOperation operationCmpFalse = generateBinaryOpWithOneOut(OP_CMP_NE, rExpression, rFalse, rCmpResult);
+    IlocOperation operationCmpFalse = generateBinaryOpWithOneOut(OP_CMP_NE, rExpression, rFalse, labelFalse);
     addOperationToIlocList(operationList, operationCmpFalse);
-
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, rCmpResult, labelTrue, labelFalse);
-    addOperationToIlocList(operationList, operationCbr);
     
     // IF TRUE
     IlocOperation operationNopTrue = generateNop();
@@ -808,10 +802,8 @@ flow_control_commands: TK_PR_WHILE '(' expression start_flow_control_block comma
     addIlocListToIlocList(operationList, $3->operationList);
 
     // Gerar salto condicional
-    IlocOperation operationCmpFalse = generateBinaryOpWithOneOut(OP_CMP_NE, rExpression, rFalse, rCmpResult);
+    IlocOperation operationCmpFalse = generateBinaryOpWithOneOut(OP_CMP_NE, rExpression, rFalse, labelEnd);
     addOperationToIlocList(operationList, operationCmpFalse);
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, rCmpResult, labelTrue, labelEnd);
-    addOperationToIlocList(operationList, operationCbr);
 
     // Executar bloco de comando em caso verdadeiro
     IlocOperation operationNopTrue = generateNop();
@@ -861,8 +853,28 @@ expression_grade_eight: expression_grade_eight TK_OC_OR expression_grade_seven {
     int r2 = $3->outRegister;
     int r3 = generateRegister(globalVariableList);
 
-    IlocOperation operation = generateBinaryOpWithOneOut(OP_OR, r1, r2, r3);
-    addOperationToIlocList(operationList, operation);
+    int labelTrue = generateLabel();
+    int labelFalse = generateLabel();
+    int labelEnd = generateLabel();
+
+    IlocOperation operationOr = generateBinaryOpWithTwoOuts(OP_OR, r1, r2, labelTrue, labelFalse);
+    addOperationToIlocList(operationList, operationOr);
+
+    // IF TRUE
+    IlocOperation operationTrue = generateUnaryOpWithOneOut(OP_LOADI, 1, r3);
+    operationTrue = addLabelToOperation(operationTrue, labelTrue);
+    IlocOperation operationJumpAfterTrue = generateUnaryOpWithoutOut(OP_JUMPI, labelEnd);
+    addOperationToIlocList(operationList, operationTrue);
+    addOperationToIlocList(operationList, operationJumpAfterTrue);
+
+    // ELSE
+    IlocOperation operationFalse = generateUnaryOpWithOneOut(OP_LOADI, 0, r3);
+    operationFalse = addLabelToOperation(operationFalse, labelFalse);
+    addOperationToIlocList(operationList, operationFalse);
+
+    IlocOperation operationNop = generateNop();
+    operationNop = addLabelToOperation(operationNop, labelEnd);
+    addOperationToIlocList(operationList, operationNop);
 
     $$->outRegister = r3;
     $$->operationList = operationList;
@@ -883,8 +895,26 @@ expression_grade_seven: expression_grade_seven TK_OC_AND expression_grade_six {
     int r2 = $3->outRegister;
     int r3 = generateRegister(globalVariableList);
 
-    IlocOperation operation = generateBinaryOpWithOneOut(OP_AND, r1, r2, r3);
-    addOperationToIlocList(operationList, operation);
+    int labelFalse = generateLabel();
+    int labelEnd = generateLabel();
+    
+    IlocOperation operationAnd = generateBinaryOpWithOneOut(OP_AND, r1, r2, labelFalse);
+    addOperationToIlocList(operationList, operationAnd);
+
+    // IF TRUE
+    IlocOperation operationTrue = generateUnaryOpWithOneOut(OP_LOADI, 1, r3);
+    IlocOperation operationJumpAfterTrue = generateUnaryOpWithoutOut(OP_JUMPI, labelEnd);
+    addOperationToIlocList(operationList, operationTrue);
+    addOperationToIlocList(operationList, operationJumpAfterTrue);
+
+    // ELSE
+    IlocOperation operationFalse = generateUnaryOpWithOneOut(OP_LOADI, 0, r3);
+    operationFalse = addLabelToOperation(operationFalse, labelFalse);
+    addOperationToIlocList(operationList, operationFalse);
+
+    IlocOperation operationNop = generateNop();
+    operationNop = addLabelToOperation(operationNop, labelEnd);
+    addOperationToIlocList(operationList, operationNop);
 
     $$->outRegister = r3;
     $$->operationList = operationList;
@@ -903,22 +933,16 @@ expression_grade_six: expression_grade_six TK_OC_EQ expression_grade_five {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister(globalVariableList);
     int r4 = generateRegister(globalVariableList);
 
-    int labelTrue = generateLabel();
     int labelFalse = generateLabel();
     int labelEnd = generateLabel();
     
-    IlocOperation operationCmpEQ = generateBinaryOpWithOneOut(OP_CMP_EQ, r1, r2, r3);
+    IlocOperation operationCmpEQ = generateBinaryOpWithOneOut(OP_CMP_EQ, r1, r2, labelFalse);
     addOperationToIlocList(operationList, operationCmpEQ);
-
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, r3, labelTrue, labelFalse);
-    addOperationToIlocList(operationList, operationCbr);
 
     // IF TRUE
     IlocOperation operationTrue = generateUnaryOpWithOneOut(OP_LOADI, 1, r4);
-    operationTrue = addLabelToOperation(operationTrue, labelTrue);
     IlocOperation operationJumpAfterTrue = generateUnaryOpWithoutOut(OP_JUMPI, labelEnd);
     addOperationToIlocList(operationList, operationTrue);
     addOperationToIlocList(operationList, operationJumpAfterTrue);
@@ -945,22 +969,16 @@ expression_grade_six: expression_grade_six TK_OC_NE expression_grade_five {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister(globalVariableList);
     int r4 = generateRegister(globalVariableList);
 
-    int labelTrue = generateLabel();
     int labelFalse = generateLabel();
     int labelEnd = generateLabel();
     
-    IlocOperation operationCmpNE = generateBinaryOpWithOneOut(OP_CMP_NE, r1, r2, r3);
+    IlocOperation operationCmpNE = generateBinaryOpWithOneOut(OP_CMP_NE, r1, r2, labelFalse);
     addOperationToIlocList(operationList, operationCmpNE);
-
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, r3, labelTrue, labelFalse);
-    addOperationToIlocList(operationList, operationCbr);
 
     // IF TRUE
     IlocOperation operationTrue = generateUnaryOpWithOneOut(OP_LOADI, 1, r4);
-    operationTrue = addLabelToOperation(operationTrue, labelTrue);
     IlocOperation operationJumpAfterTrue = generateUnaryOpWithoutOut(OP_JUMPI, labelEnd);
     addOperationToIlocList(operationList, operationTrue);
     addOperationToIlocList(operationList, operationJumpAfterTrue);
@@ -991,22 +1009,16 @@ expression_grade_five: expression_grade_five '>' expression_grade_four {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister(globalVariableList);
     int r4 = generateRegister(globalVariableList);
 
-    int labelTrue = generateLabel();
     int labelFalse = generateLabel();
     int labelEnd = generateLabel();
     
-    IlocOperation operationCmpGT = generateBinaryOpWithOneOut(OP_CMP_GT, r1, r2, r3);
+    IlocOperation operationCmpGT = generateBinaryOpWithOneOut(OP_CMP_GT, r1, r2, labelFalse);
     addOperationToIlocList(operationList, operationCmpGT);
-
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, r3, labelTrue, labelFalse);
-    addOperationToIlocList(operationList, operationCbr);
 
     // IF TRUE
     IlocOperation operationTrue = generateUnaryOpWithOneOut(OP_LOADI, 1, r4);
-    operationTrue = addLabelToOperation(operationTrue, labelTrue);
     IlocOperation operationJumpAfterTrue = generateUnaryOpWithoutOut(OP_JUMPI, labelEnd);
     addOperationToIlocList(operationList, operationTrue);
     addOperationToIlocList(operationList, operationJumpAfterTrue);
@@ -1033,22 +1045,16 @@ expression_grade_five: expression_grade_five '<' expression_grade_four {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister(globalVariableList);
     int r4 = generateRegister(globalVariableList);
 
-    int labelTrue = generateLabel();
     int labelFalse = generateLabel();
     int labelEnd = generateLabel();
     
-    IlocOperation operationCmpLT = generateBinaryOpWithOneOut(OP_CMP_LT, r1, r2, r3);
+    IlocOperation operationCmpLT = generateBinaryOpWithOneOut(OP_CMP_LT, r1, r2, labelFalse);
     addOperationToIlocList(operationList, operationCmpLT);
-
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, r3, labelTrue, labelFalse);
-    addOperationToIlocList(operationList, operationCbr);
 
     // IF TRUE
     IlocOperation operationTrue = generateUnaryOpWithOneOut(OP_LOADI, 1, r4);
-    operationTrue = addLabelToOperation(operationTrue, labelTrue);
     IlocOperation operationJumpAfterTrue = generateUnaryOpWithoutOut(OP_JUMPI, labelEnd);
     addOperationToIlocList(operationList, operationTrue);
     addOperationToIlocList(operationList, operationJumpAfterTrue);
@@ -1075,22 +1081,16 @@ expression_grade_five: expression_grade_five TK_OC_LE expression_grade_four {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister(globalVariableList);
     int r4 = generateRegister(globalVariableList);
 
-    int labelTrue = generateLabel();
     int labelFalse = generateLabel();
     int labelEnd = generateLabel();
     
-    IlocOperation operationCmpLE = generateBinaryOpWithOneOut(OP_CMP_LE, r1, r2, r3);
+    IlocOperation operationCmpLE = generateBinaryOpWithOneOut(OP_CMP_LE, r1, r2, labelFalse);
     addOperationToIlocList(operationList, operationCmpLE);
-
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, r3, labelTrue, labelFalse);
-    addOperationToIlocList(operationList, operationCbr);
 
     // IF TRUE
     IlocOperation operationTrue = generateUnaryOpWithOneOut(OP_LOADI, 1, r4);
-    operationTrue = addLabelToOperation(operationTrue, labelTrue);
     IlocOperation operationJumpAfterTrue = generateUnaryOpWithoutOut(OP_JUMPI, labelEnd);
     addOperationToIlocList(operationList, operationTrue);
     addOperationToIlocList(operationList, operationJumpAfterTrue);
@@ -1117,22 +1117,16 @@ expression_grade_five: expression_grade_five TK_OC_GE expression_grade_four {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister(globalVariableList);
     int r4 = generateRegister(globalVariableList);
 
-    int labelTrue = generateLabel();
     int labelFalse = generateLabel();
     int labelEnd = generateLabel();
     
-    IlocOperation operationCmpGE = generateBinaryOpWithOneOut(OP_CMP_GE, r1, r2, r3);
+    IlocOperation operationCmpGE = generateBinaryOpWithOneOut(OP_CMP_GE, r1, r2, labelFalse);
     addOperationToIlocList(operationList, operationCmpGE);
-
-    IlocOperation operationCbr = generateUnaryOpWithTwoOuts(OP_CBR, r3, labelTrue, labelFalse);
-    addOperationToIlocList(operationList, operationCbr);
 
     // IF TRUE
     IlocOperation operationTrue = generateUnaryOpWithOneOut(OP_LOADI, 1, r4);
-    operationTrue = addLabelToOperation(operationTrue, labelTrue);
     IlocOperation operationJumpAfterTrue = generateUnaryOpWithoutOut(OP_JUMPI, labelEnd);
     addOperationToIlocList(operationList, operationTrue);
     addOperationToIlocList(operationList, operationJumpAfterTrue);

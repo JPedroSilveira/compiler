@@ -30,49 +30,37 @@
     .text 
     .globl _temp_r_10 
     .zerofill __DATA,__common,_temp_r_10,4,2 
-    .text 
-    .globl _temp_r_11 
-    .zerofill __DATA,__common,_temp_r_11,4,2 
 _main: 
     pushq   %rbp 
     movq    %rsp, %rbp 
-    movl    $0, _temp_r_1(%rip) 
+    movl    $10, _temp_r_1(%rip) 
     movl    _temp_r_1(%rip), %eax 
     movl    %eax, -8(%rbp) 
-    movl    $10, _temp_r_2(%rip) 
+    movl    $20, _temp_r_2(%rip) 
     movl    _temp_r_2(%rip), %eax 
     movl    %eax, -12(%rbp) 
-    movl    $0, _temp_r_9(%rip) 
-L4: 
-    movl    -8(%rbp), %eax 
-    movl    %eax, _temp_r_3(%rip) 
     movl    -12(%rbp), %eax 
+    movl    %eax, _temp_r_3(%rip) 
+    movl    -8(%rbp), %eax 
     movl    %eax, _temp_r_4(%rip) 
     movl    _temp_r_3(%rip), %eax 
     cmpl    _temp_r_4(%rip), %eax 
-    jg      L2 
-    movl    $1, _temp_r_5(%rip) 
-    jmp     L3 
-L2: 
-    movl    $0, _temp_r_5(%rip) 
-L3: 
-    movl    _temp_r_5(%rip), %eax 
-    cmpl    _temp_r_9(%rip), %eax 
-    je      L6 
-L5: 
-    movl    -8(%rbp), %eax 
-    movl    %eax, _temp_r_6(%rip) 
-    movl    $1, _temp_r_7(%rip) 
-    movl    _temp_r_6(%rip), %edx 
+    jle     L3 
+_L2: 
+    movl    $1, _temp_r_6(%rip) 
+    jmp L4 
+_L3: 
+    movl    $0, _temp_r_6(%rip) 
+_L4: 
+    movl    $0, _temp_r_8(%rip) 
+    cmp_NE r6, r8 -> r6 
+_L5: 
+    movl    $100, _temp_r_7(%rip) 
     movl    _temp_r_7(%rip), %eax 
-    addl    %edx, %eax 
-    movl    %eax, _temp_r_8(%rip) 
-    movl    _temp_r_8(%rip), %eax 
-    movl    %eax, -8(%rbp) 
-    jmp     L4 
-L6: 
-    movl    -8(%rbp), %eax 
-    movl    %eax, _temp_r_11(%rip) 
-    movl    _temp_r_11(%rip), %eax 
+    movl    %eax, -12(%rbp) 
+_L6: 
+    movl    -12(%rbp), %eax 
+    movl    %eax, _temp_r_10(%rip) 
+    movl    _temp_r_10(%rip), %eax 
     popq	%rbp 
     ret 

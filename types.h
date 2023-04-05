@@ -134,7 +134,6 @@ typedef enum IlocOperationType {
     OP_DIV,
     OP_NEG,
     OP_CMP_GE,
-    OP_CBR,
     OP_JUMPI,
     OP_LOAD_FUNCTION_RETURN,
     OP_RETURN,

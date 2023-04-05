@@ -6,11 +6,16 @@ LFB0:
 LCFI0:
 	movq	%rsp, %rbp
 LCFI1:
-	movl	$10, -4(%rbp)
+	movl	$1, -8(%rbp)
+	movl	$1, -4(%rbp)
+	cmpl	$0, -8(%rbp)
+	jne	L2
+	cmpl	$0, -4(%rbp)
+	je	L3
+L2:
+	movl	$100, -4(%rbp)
+L3:
 	movl	-4(%rbp), %eax
-	negl	%eax
-	movl	%eax, -8(%rbp)
-	movl	-8(%rbp), %eax
 	popq	%rbp
 LCFI2:
 	ret

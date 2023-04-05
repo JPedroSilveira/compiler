@@ -302,7 +302,7 @@ class Sim:
 
    def op_jump   (self,op): self.ip = self.reg[op[0]]
    def op_jumpI  (self,op): self.ip = op[0]
-   def op_cbr    (self,op): self.ip = op[1] if self.reg[op[0]] else op[2]
+   def OP_JUMP_FALSE    (self,op): self.ip = op[1] if self.reg[op[0]] else op[2]
 
    def op_print  (self,op): print(self.reg[op[0]])
    def op_printI (self,op): print(op[0])

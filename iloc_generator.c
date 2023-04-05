@@ -146,7 +146,7 @@ void convertOperationWithLabel(IlocOperation operation)
     } 
     else 
     {
-        printf("_L%d: \n", operation.label);
+        printf("L%d: \n", operation.label);
     }
 
     if (operation.isFunction)
@@ -216,38 +216,53 @@ void convertOperationToCode(IlocOperation operation)
             printf("    negl	%s \n", "%eax");
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
+        case OP_CMP_GE: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    jle     L%d \n", operation.out1);
+            break;
+        case OP_JUMPI: // Done
+            printf("    jmp     L%d \n", operation.op1);
+            break;
+        case OP_CMP_NE: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    je      L%d \n", operation.out1);
+            break;
+        case OP_CMP_LE: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    jg      L%d \n", operation.out1);
+            break;
+        case OP_CMP_LT: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    jge     L%d \n", operation.out1);
+            break;
+        case OP_CMP_GT: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    jle     L%d \n", operation.out1);
+            break;
+        case OP_CMP_EQ: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    jne     L%d \n", operation.out1);            
+            break;
+        case OP_AND: // Done
+            printf("    cmpl   $0, _temp_r_%d(%s) \n", operation.op1, "%rip");
+            printf("    je     L%d \n", operation.out1);    
+            printf("    cmpl   $0, _temp_r_%d(%s) \n", operation.op2, "%rip");
+            printf("    je     L%d \n", operation.out1);   
+            break;
+        case OP_OR: // Done
+            printf("    cmpl   $0, _temp_r_%d(%s) \n", operation.op1, "%rip");
+            printf("    jne     L%d \n", operation.out1);    
+            printf("    cmpl   $0, _temp_r_%d(%s) \n", operation.op2, "%rip");
+            printf("    je     L%d \n", operation.out2);
+            break;
         case OP_ADD_TO_STACK_POINTER:
             printf("    add r0, r%d => r0 \n", operation.op1);
-            break;
-        case OP_CMP_GE:
-            printf("    cmp_GE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_CBR:
-            printf("    cbr r%d -> l%d, l%d \n", operation.op1, operation.out1, operation.out2);
-            break;
-        case OP_JUMPI:
-            printf("    jumpI -> l%d \n", operation.op1);
-            break;
-        case OP_CMP_LE:
-            printf("    cmp_LE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_CMP_LT:
-            printf("    cmp_LT r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_CMP_GT:
-            printf("    cmp_GT r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_CMP_NE:
-            printf("    cmp_NE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_CMP_EQ:
-            printf("    cmp_EQ r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_AND:
-            printf("    and r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_OR:
-            printf("    or r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_LOADI_TO_STACK_POINTER:
             printf("    addI r%d, 0 => r0 \n", operation.op1);
