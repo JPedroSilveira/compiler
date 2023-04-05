@@ -18,3 +18,11 @@ scanner: scanner.l
 
 all: main scanner
 	$(COMPILER) lex.yy.o main.o -o etapa5
+
+s: 
+	gcc-12 -S example.c
+
+c: 
+	gcc-12 example.s -o example
+	./example
+	echo $?

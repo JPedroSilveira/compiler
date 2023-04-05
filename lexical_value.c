@@ -16,6 +16,17 @@ LexicalValue createLexicalValue(char* text, TokenType type, LiteralType literalT
     return lexicalValue;
 }
 
+LexicalValue createLexicalValueFromTemporary(int temporary)
+{
+    LexicalValue lexicalValue;
+    lexicalValue.lineNumber = temporary;
+    lexicalValue.type = TOKEN_TYPE_TEMPORARY;
+    lexicalValue.functionLabel = -1;
+    lexicalValue.label = NULL;
+
+    return lexicalValue;
+}
+
 char* getLabelName(char* text, LiteralType literalType) {
     if (!strcmp(text, "[") || !strcmp(text, "]")) 
     {

@@ -8,6 +8,7 @@
 #include "types.h"
 
 LexicalValue createLexicalValue(char* text, TokenType type, LiteralType literalType, int lineNumber);
+LexicalValue createLexicalValueFromTemporary(int temporary);
 void defineLiteralValue(LexicalValue* lexicalValue, char* text, LiteralType literalType);
 int isTextEqualTrue(char* text);
 char* getLabelName(char* text, LiteralType literalType);

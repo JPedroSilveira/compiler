@@ -6,21 +6,29 @@ int generateLabel()
   return label_counter++;
 }
 
-int generateRegister()
+int generateRegister(GlobalVariableList* globalVariableList)
 {
   static int register_counter = 1;
-  return register_counter++;
+  int new_register = register_counter++;
+  // Working only with integers
+  LexicalValue lexicalValue = createLexicalValueFromTemporary(new_register);
+  addVariableToGlobalVariableList(globalVariableList, lexicalValue, DATA_TYPE_INT);
+  return new_register;
 }
 
 IlocOperation generate_empty_operation() 
 {
     IlocOperation operation;
     operation.label = -1;
+    operation.functionLabel = NULL;
+    operation.globalVariable = NULL;
     operation.op1 = -1;
     operation.op2 = -1;
     operation.out1 = -1;
     operation.out2 = -1;
     operation.type = -1;
+    operation.isMain = 0;
+    operation.isFunction = 0;
     return operation;
 }
 
@@ -35,6 +43,21 @@ IlocOperation generateNop()
 {
     IlocOperation operation = generate_empty_operation();
     operation.type = OP_NOP;
+    return operation;
+}
+
+IlocOperation generateFunctionNop(char* functioLabel)
+{
+    IlocOperation operation = generate_empty_operation();
+    operation.type = OP_NOP;
+    operation.isFunction = 1;
+    operation.functionLabel = malloc(strlen(functioLabel) + 1);
+    strcpy(operation.functionLabel, functioLabel);
+
+    if (strncmp(operation.functionLabel, "main", 4) == 0) {
+        operation.isMain = 1;
+    }  
+
     return operation;
 }
 
@@ -75,6 +98,18 @@ IlocOperation generateUnaryOpWithOneOut(IlocOperationType type, int op, int out)
     return operation;
 }
 
+IlocOperation generateUnaryOpWithOneOutForGlobalVariable(IlocOperationType type, char* label, int out)
+{
+    IlocOperation operation = generate_empty_operation();
+    operation.type = type;
+    operation.globalVariable = malloc(strlen(label) + 1);
+    strcpy(operation.globalVariable, label);
+    operation.out1 = out;
+    return operation;
+}
+
+
+
 IlocOperation generateUnaryOpWithTwoOuts(IlocOperationType type, int op, int out1, int out2) 
 {
     IlocOperation operation = generate_empty_operation();
@@ -99,93 +134,132 @@ IlocOperation addLabelToOperation(IlocOperation operation, int label)
     return operation;
 }
 
+void convertOperationWithLabel(IlocOperation operation) 
+{
+    if (operation.isMain) 
+    {
+        printf("_main: \n");
+    } 
+    else if (operation.isFunction)
+    {
+        printf("_%s: \n", operation.functionLabel);
+    } 
+    else 
+    {
+        printf("_L%d: \n", operation.label);
+    }
+
+    if (operation.isFunction)
+    {
+        printf("    pushq   %s \n", "%rbp");
+        printf("    movq    %s \n", "%rsp, %rbp");
+    }
+}
+
 void convertOperationToCode(IlocOperation operation) 
 {
     if (operation.type != OP_INVALID && operation.label != -1) {
-        printf("l%d: ", operation.label);
+        convertOperationWithLabel(operation);
     }
     switch (operation.type)
     {  
-        case OP_ADD:
-            printf("add r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
+        case OP_LOADAI_GLOBAL: // Done
+            printf("    movl    _%s(%s), %s \n", operation.globalVariable, "%rip", "%eax");
+            printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
+            break;
+        case OP_LOADAI_LOCAL: // Done
+            printf("    movl    -%d(%s), %s \n", operation.op1, "%rbp", "%eax");
+            printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
+            break;
+        case OP_LOADI: // Done
+            printf("    movl    $%d, _temp_r_%d(%s) \n", operation.op1, operation.out1, "%rip");
+            break;
+        case OP_STOREAI_GLOBAL: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.out1, "%rip", "%eax");
+            printf("    movl    %s, _%s(%s) \n", "%eax", operation.globalVariable, "%rip");
+            break;
+        case OP_STOREAI_LOCAL: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    movl    %s, -%d(%s) \n", "%eax", operation.out1, "%rbp");
+            break;
+        case OP_LOAD_FUNCTION_RETURN:  // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            break;
+        case OP_RETURN: // Done
+            printf("    popq	%s \n", "%rbp");
+            printf("    ret \n"); 
+            break;
+        case OP_ADD: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%edx");
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    addl    %s, %s \n",  "%edx", "%eax");
+            printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
+            break;
+        case OP_SUB: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    subl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
+            break;
+        case OP_MULT: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    imull   _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
+            printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
+            break;
+        case OP_DIV: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    cltd \n");
+            printf("    idivl	_temp_r_%d(%s) \n", operation.op2, "%rip");
+            printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
+            break;
+        case OP_NEG: // Done
+            printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
+            printf("    negl	%s \n", "%eax");
+            printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
         case OP_ADD_TO_STACK_POINTER:
-            printf("add r0, r%d => r0 \n", operation.op1);
-            break;
-        case OP_SUB:
-            printf("sub r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_MULT:
-            printf("mult r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_DIV:
-            printf("div r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_NEG:
-            printf("rsubI r%d, 0 => r%d \n", operation.op1, operation.out1);
+            printf("    add r0, r%d => r0 \n", operation.op1);
             break;
         case OP_CMP_GE:
-            printf("cmp_GE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
+            printf("    cmp_GE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_CBR:
-            printf("cbr r%d -> l%d, l%d \n", operation.op1, operation.out1, operation.out2);
+            printf("    cbr r%d -> l%d, l%d \n", operation.op1, operation.out1, operation.out2);
             break;
         case OP_JUMPI:
-            printf("jumpI -> l%d \n", operation.op1);
-            break;
-        case OP_JUMPI_REGISTER:
-            printf("jump -> r%d \n", operation.op1);
+            printf("    jumpI -> l%d \n", operation.op1);
             break;
         case OP_CMP_LE:
-            printf("cmp_LE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
+            printf("    cmp_LE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_CMP_LT:
-            printf("cmp_LT r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
+            printf("    cmp_LT r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_CMP_GT:
-            printf("cmp_GT r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
+            printf("    cmp_GT r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_CMP_NE:
-            printf("cmp_NE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
+            printf("    cmp_NE r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_CMP_EQ:
-            printf("cmp_EQ r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
+            printf("    cmp_EQ r%d, r%d -> r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_AND:
-            printf("and r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
+            printf("    and r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_OR:
-            printf("or r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
-            break;
-        case OP_LOADAI_GLOBAL:
-            printf("loadAI rbss, %d => r%d \n", operation.op1, operation.out1);
-            break;
-        case OP_LOADAI_LOCAL:
-            printf("loadAI r0, %d => r%d \n", operation.op1, operation.out1);
-            break;
-        case OP_LOADI:
-            printf("loadI %d => r%d \n", operation.op1, operation.out1);
+            printf("    or r%d, r%d => r%d \n", operation.op1, operation.op2, operation.out1);
             break;
         case OP_LOADI_TO_STACK_POINTER:
-            printf("addI r%d, 0 => r0 \n", operation.op1);
+            printf("    addI r%d, 0 => r0 \n", operation.op1);
             break;
         case OP_LOAD_RFP_TO_STACK_POINTER:
-            printf("addI rfp, 0 => r0 \n");
+            printf("    addI rfp, 0 => r0 \n");
             break;
         case OP_LOAD_STACK_POINTER:
-            printf("addI r0, 0 => r%d \n", operation.op1);
+            printf("    addI r0, 0 => r%d \n", operation.op1);
             break;
         case OP_LOAD_PC:
-            printf("addI rpc, 0 => r%d \n", operation.op1);
-            break;
-        case OP_STOREAI_GLOBAL:
-            printf("storeAI r%d => rbss, %d \n", operation.op1, operation.out1);
-            break;
-        case OP_STOREAI_LOCAL:
-            printf("storeAI r%d => r0, %d \n", operation.op1, operation.out1);
-            break;
-        case OP_NOP:
-            printf("nop \n");
+            printf("    addI rpc, 0 => r%d \n", operation.op1);
             break;
         default:
             break;
@@ -201,6 +275,47 @@ void generateCode(IlocOperationList* operationList)
         IlocOperation operation = nextOperation->operation;
         convertOperationToCode(operation);
         nextOperation = nextOperation->nextItem;
+    }
+}
+
+void generateGlobalDeclarationCodeForInteger(GlobalVariableList* globalVariableList)
+{
+    LexicalValue lexicalValue = globalVariableList->lexicalValue;
+    printf("    .text \n");
+    if (lexicalValue.type == TOKEN_TYPE_TEMPORARY) 
+    {
+        printf("    .globl _temp_r_%d \n", lexicalValue.lineNumber);
+        printf("    .zerofill __DATA,__common,_temp_r_%d,4,2 \n", lexicalValue.lineNumber);
+    }
+    else 
+    {
+        printf("    .globl _%s \n", lexicalValue.label);
+        printf("    .zerofill __DATA,__common,_%s,4,2 \n", lexicalValue.label);
+    }
+}
+
+void generateGlobalDeclarationCodeForFunction(GlobalVariableList* globalVariableList)
+{
+    LexicalValue lexicalValue = globalVariableList->lexicalValue;
+    printf("    .text \n");
+    printf("    .globl _%s \n", lexicalValue.label);
+}
+
+
+void generateGlobalDeclarationCode(GlobalVariableList* globalVariableList)
+{
+    GlobalVariableList* currentGlobalVariable = globalVariableList;
+    while(currentGlobalVariable->dataType != DATA_TYPE_NON_DECLARED) 
+    {
+        if (currentGlobalVariable->dataType == DATA_TYPE_INT) 
+        {
+            generateGlobalDeclarationCodeForInteger(currentGlobalVariable);
+        } 
+        else if (currentGlobalVariable->dataType == DATA_TYPE_FUNCTION) 
+        {
+            generateGlobalDeclarationCodeForFunction(currentGlobalVariable);
+        }
+        currentGlobalVariable = currentGlobalVariable->nextItem;
     }
 }
 
@@ -313,4 +428,37 @@ FunctionCallArgument* addFunctionCallArgument(FunctionCallArgument* functionCall
     FunctionCallArgument* newFunctionCallArgument = createFunctionCallArgument(value);
     newFunctionCallArgument->nextArgument = functionCallArgument;
     return newFunctionCallArgument;
+}
+
+GlobalVariableList* createGlobalVariableList()
+{
+    GlobalVariableList* list = malloc(sizeof(GlobalVariableList));
+    if (!list) 
+    {
+        printError("[GlobalVariableList] Fail to create global variable list!");
+        return NULL;
+    }
+    list->dataType = DATA_TYPE_NON_DECLARED;
+    list->nextItem = NULL;
+    return list;
+}
+
+void addVariableToGlobalVariableList(GlobalVariableList* globalVariableList, LexicalValue lexicalValue, DataType dataType)
+{
+    if (globalVariableList == NULL)
+    {
+        printError("[GlobalVariableList] Fail to add item to global variable list!");
+        return;
+    }
+    
+    GlobalVariableList* lastGlobalVariable = globalVariableList;
+    while(lastGlobalVariable->dataType != DATA_TYPE_NON_DECLARED)
+    {
+        lastGlobalVariable = lastGlobalVariable->nextItem;
+    }
+
+    GlobalVariableList* newGlobalVariable = createGlobalVariableList();
+    lastGlobalVariable->lexicalValue = lexicalValue;
+    lastGlobalVariable->dataType = dataType;
+    lastGlobalVariable->nextItem = newGlobalVariable;
 }

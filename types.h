@@ -18,6 +18,7 @@ typedef enum DataType {
     DATA_TYPE_FLOAT,
     DATA_TYPE_CHAR,
     DATA_TYPE_BOOL,
+    DATA_TYPE_FUNCTION,
     DATA_TYPE_NON_DECLARED
 } DataType;
 
@@ -29,7 +30,8 @@ typedef enum TokenType {
     TOKEN_TYPE_RESERVED_WORD,
     TOKEN_TYPE_COMPOUND_OPERATOR,
     TOKEN_TYPE_IDENTIFIER,
-    TOKEN_TYPE_LITERAL
+    TOKEN_TYPE_LITERAL,
+    TOKEN_TYPE_TEMPORARY
 } TokenType;
 
 typedef enum LiteralType {
@@ -134,7 +136,8 @@ typedef enum IlocOperationType {
     OP_CMP_GE,
     OP_CBR,
     OP_JUMPI,
-    OP_JUMPI_REGISTER,
+    OP_LOAD_FUNCTION_RETURN,
+    OP_RETURN,
     OP_CMP_LE,
     OP_CMP_LT,
     OP_CMP_GT,
@@ -156,6 +159,10 @@ typedef enum IlocOperationType {
 
 typedef struct IlocOperation {
     IlocOperationType type;
+    int isMain;
+    int isFunction;
+    char* functionLabel;
+    char* globalVariable;
     int label;
     int op1;
     int op2;
@@ -173,5 +180,11 @@ typedef struct FunctionCallArgument {
     struct Node* node;
     struct FunctionCallArgument* nextArgument;
 } FunctionCallArgument;
+
+typedef struct GlobalVariableList {
+    DataType dataType;
+    LexicalValue lexicalValue;
+    struct GlobalVariableList* nextItem;
+} GlobalVariableList;
 
 #endif

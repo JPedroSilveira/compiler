@@ -10,15 +10,13 @@
 #include "print.h"
 
 DataType declaredType = DATA_TYPE_NON_DECLARED;
-int mainLabel = 0;
-int mainPosition = 0;
-int currentRFPOffset = 0;
 
 int yylex(void);
 void yyerror (char const *message);
 int get_line_number();
 extern Node* tree;
 extern SymbolTableStack* symbolTableStack;
+extern GlobalVariableList* globalVariableList;
 %}
 
 %code requires {
@@ -115,25 +113,11 @@ program: elements_list {
     $$ = $1; 
     tree = $$;
 
-    int r1 = generateRegister();
+    IlocOperationList* operationList = createIlocList();
 
-    IlocOperationList* operationListStartingWithMain = createIlocList();
+    addIlocListToIlocList(operationList, $$->operationList);
 
-    IlocOperation operationStartStackPointer = generateUnaryOp(OP_LOAD_RFP_TO_STACK_POINTER);
-    addOperationToIlocList(operationListStartingWithMain, operationStartStackPointer);
-
-    IlocOperation operationLoadFinalJump = generateUnaryOpWithOneOut(OP_LOADI, 40000, r1);
-    addOperationToIlocList(operationListStartingWithMain, operationLoadFinalJump);
-
-    IlocOperation operationStoreReturnAddress = generateUnaryOpWithOneOut(OP_STOREAI_LOCAL, r1, 0); 
-    addOperationToIlocList(operationListStartingWithMain, operationStoreReturnAddress);
-
-    IlocOperation operationJumpToMain = generateUnaryOpWithoutOut(OP_JUMPI, mainLabel);
-    addOperationToIlocList(operationListStartingWithMain, operationJumpToMain);
-
-    addIlocListToIlocList(operationListStartingWithMain, $$->operationList);
-
-    $$->operationList = operationListStartingWithMain;
+    $$->operationList = operationList;
 };
 
 elements_list: function elements_list { 
@@ -195,7 +179,7 @@ literal: TK_LIT_INT {
     IlocOperationList* operationList = createIlocList();
 
     int c1 = $1.value.value_int;
-    int r1 = generateRegister();
+    int r1 = generateRegister(globalVariableList);
 
     IlocOperation operation = generateUnaryOpWithOneOut(OP_LOADI, c1, r1);
     addOperationToIlocList(operationList, operation);
@@ -246,6 +230,8 @@ var_list: TK_IDENTIFICADOR {
     
     SymbolTableValue symbol = createSymbolTableValueWithType(SYMBOL_TYPE_VARIABLE, $1, declaredType);
     addValueToSymbolTableStack(symbolTableStack, symbol);
+
+    addVariableToGlobalVariableList(globalVariableList, $1, declaredType);
 };
 
 var_list: array { 
@@ -299,14 +285,6 @@ function: header body {
         addIlocListToIlocList($$->operationList, $2->operationList);
         updateFunctionLastPosition(symbolTableStack, $$->lexicalValue, $2->lastPosition);
     }
-
-    int r1 = generateRegister();
-
-    IlocOperation loadReturnAddressOperation = generateUnaryOpWithOneOut(OP_LOADAI_LOCAL, 0, r1);
-    addOperationToIlocList($$->operationList, loadReturnAddressOperation);
-
-    IlocOperation jumpBackOperation = generateUnaryOpWithoutOut(OP_JUMPI_REGISTER, r1);
-    addOperationToIlocList($$->operationList, jumpBackOperation);
 };
 
 header: type function_name arguments {
@@ -315,17 +293,14 @@ header: type function_name arguments {
     SymbolTableValue symbol = createSymbolTableValueWithTypeAndArguments(SYMBOL_TYPE_FUNCTION, $2, $1, $3, functionLabel);
     symbol = addValueToSecondSymbolTableOnStack(symbolTableStack, symbol);
 
-    if (strncmp($2.label, "main", 4) == 0) {
-        mainLabel = functionLabel;
-        mainPosition = symbol.position;
-    }
-    
+    addVariableToGlobalVariableList(globalVariableList, $2, DATA_TYPE_FUNCTION);
+
     $$ = createNodeFromSymbol($2, symbol);
 
     IlocOperationList* operationList = createIlocList();
 
-    IlocOperation operationNop = generateNop();
-    operationNop = addLabelToOperation(operationNop, functionLabel);    
+    IlocOperation operationNop = generateFunctionNop($2.label);
+    operationNop = addLabelToOperation(operationNop, functionLabel);  
     addOperationToIlocList(operationList, operationNop);
 
     FunctionArgument* argument = $3;
@@ -500,7 +475,6 @@ var_decl_list: TK_IDENTIFICADOR TK_OC_LE literal ',' var_decl_list {
 // Atribuicao
 attribution: TK_IDENTIFICADOR '=' expression {
     SymbolTableValue symbol = getByLexicalValueOnSymbolTableStack(symbolTableStack, $1);
-
     validateVariableUse(symbol, $1);
 
     Node* variable = createNodeWithType($1, symbol.dataType);
@@ -518,7 +492,7 @@ attribution: TK_IDENTIFICADOR '=' expression {
     
     if (symbol.isGlobal)
     {
-        operation = generateUnaryOpWithOneOut(OP_STOREAI_GLOBAL, r1, address);
+        operation = generateUnaryOpWithOneOutForGlobalVariable(OP_STOREAI_GLOBAL, symbol.lexicalValue.label, r1);
     }
     else
     {
@@ -568,12 +542,12 @@ function_call: TK_IDENTIFICADOR '(' ')' {
     freeLexicalValue($2);
     freeLexicalValue($3);
 
-    int r1 = generateRegister();
-    int r2 = generateRegister();
-    int r3 = generateRegister();
-    int r4 = generateRegister();
-    int r5 = generateRegister();
-    int r6 = generateRegister();
+    int r1 = generateRegister(globalVariableList);
+    int r2 = generateRegister(globalVariableList);
+    int r3 = generateRegister(globalVariableList);
+    int r4 = generateRegister(globalVariableList);
+    int r5 = generateRegister(globalVariableList);
+    int r6 = generateRegister(globalVariableList);
 
     IlocOperationList* operationList = createIlocList();
 
@@ -623,12 +597,12 @@ function_call: TK_IDENTIFICADOR '(' arg_fn_list ')' {
     freeLexicalValue($2);
     freeLexicalValue($4);
 
-    int r1 = generateRegister();
-    int r2 = generateRegister();
-    int r3 = generateRegister();
-    int r4 = generateRegister();
-    int r5 = generateRegister();
-    int r6 = generateRegister();
+    int r1 = generateRegister(globalVariableList);
+    int r2 = generateRegister(globalVariableList);
+    int r3 = generateRegister(globalVariableList);
+    int r4 = generateRegister(globalVariableList);
+    int r5 = generateRegister(globalVariableList);
+    int r6 = generateRegister(globalVariableList);
 
     IlocOperationList* operationList = createIlocListFromOtherList($3->node->operationList);
 
@@ -704,7 +678,10 @@ return_command: TK_PR_RETURN expression {
 
     IlocOperationList* operationList = createIlocListFromOtherList($2->operationList);
 
-    IlocOperation returnOperation = generateUnaryOpWithOneOut(OP_STOREAI_LOCAL, $2->outRegister, 4);
+    IlocOperation loadReturnOperation = generateUnaryOpWithoutOut(OP_LOAD_FUNCTION_RETURN, $2->outRegister);
+    addOperationToIlocList(operationList, loadReturnOperation);
+
+    IlocOperation returnOperation = generateUnaryOp(OP_RETURN);
     addOperationToIlocList(operationList, returnOperation);
 
     $$->operationList = operationList;
@@ -721,8 +698,8 @@ flow_control_commands: TK_PR_IF '(' expression start_flow_control_block TK_PR_TH
     IlocOperationList* operationList = createIlocListFromOtherList($3->operationList);
 
     int rExpression = $3->outRegister;
-    int rFalse = generateRegister();
-    int rCmpResult = generateRegister();
+    int rFalse = generateRegister(globalVariableList);
+    int rCmpResult = generateRegister(globalVariableList);
 
     int labelTrue = generateLabel();
     int labelEnd = generateLabel();
@@ -760,8 +737,8 @@ flow_control_commands: TK_PR_IF '(' expression start_flow_control_block TK_PR_TH
     IlocOperationList* operationList = createIlocListFromOtherList($3->operationList);
 
     int rExpression = $3->outRegister;
-    int rFalse = generateRegister();
-    int rCmpResult = generateRegister();
+    int rFalse = generateRegister(globalVariableList);
+    int rCmpResult = generateRegister(globalVariableList);
 
     int labelTrue = generateLabel();
     int labelFalse = generateLabel();
@@ -809,8 +786,8 @@ flow_control_commands: TK_PR_WHILE '(' expression start_flow_control_block comma
     freeLexicalValue($2);
 
     int rExpression = $3->outRegister;
-    int rFalse = generateRegister();
-    int rCmpResult = generateRegister();
+    int rFalse = generateRegister(globalVariableList);
+    int rCmpResult = generateRegister(globalVariableList);
 
     int labelStart = generateLabel();
     int labelTrue = generateLabel();
@@ -882,7 +859,7 @@ expression_grade_eight: expression_grade_eight TK_OC_OR expression_grade_seven {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
 
     IlocOperation operation = generateBinaryOpWithOneOut(OP_OR, r1, r2, r3);
     addOperationToIlocList(operationList, operation);
@@ -904,7 +881,7 @@ expression_grade_seven: expression_grade_seven TK_OC_AND expression_grade_six {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
 
     IlocOperation operation = generateBinaryOpWithOneOut(OP_AND, r1, r2, r3);
     addOperationToIlocList(operationList, operation);
@@ -926,8 +903,8 @@ expression_grade_six: expression_grade_six TK_OC_EQ expression_grade_five {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
-    int r4 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
+    int r4 = generateRegister(globalVariableList);
 
     int labelTrue = generateLabel();
     int labelFalse = generateLabel();
@@ -968,8 +945,8 @@ expression_grade_six: expression_grade_six TK_OC_NE expression_grade_five {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
-    int r4 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
+    int r4 = generateRegister(globalVariableList);
 
     int labelTrue = generateLabel();
     int labelFalse = generateLabel();
@@ -1014,8 +991,8 @@ expression_grade_five: expression_grade_five '>' expression_grade_four {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
-    int r4 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
+    int r4 = generateRegister(globalVariableList);
 
     int labelTrue = generateLabel();
     int labelFalse = generateLabel();
@@ -1056,8 +1033,8 @@ expression_grade_five: expression_grade_five '<' expression_grade_four {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
-    int r4 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
+    int r4 = generateRegister(globalVariableList);
 
     int labelTrue = generateLabel();
     int labelFalse = generateLabel();
@@ -1098,8 +1075,8 @@ expression_grade_five: expression_grade_five TK_OC_LE expression_grade_four {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
-    int r4 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
+    int r4 = generateRegister(globalVariableList);
 
     int labelTrue = generateLabel();
     int labelFalse = generateLabel();
@@ -1140,8 +1117,8 @@ expression_grade_five: expression_grade_five TK_OC_GE expression_grade_four {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
-    int r4 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
+    int r4 = generateRegister(globalVariableList);
 
     int labelTrue = generateLabel();
     int labelFalse = generateLabel();
@@ -1186,7 +1163,7 @@ expression_grade_four: expression_grade_four '+' expression_grade_three {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
 
     IlocOperation operation = generateBinaryOpWithOneOut(OP_ADD, r1, r2, r3);
     addOperationToIlocList(operationList, operation);
@@ -1204,7 +1181,7 @@ expression_grade_four: expression_grade_four '-' expression_grade_three {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
 
     IlocOperation operation = generateBinaryOpWithOneOut(OP_SUB, r1, r2, r3);
     addOperationToIlocList(operationList, operation);
@@ -1226,7 +1203,7 @@ expression_grade_three: expression_grade_three '*' expression_grade_two {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
 
     IlocOperation operation = generateBinaryOpWithOneOut(OP_MULT, r1, r2, r3);
     addOperationToIlocList(operationList, operation);
@@ -1244,7 +1221,7 @@ expression_grade_three: expression_grade_three '/' expression_grade_two {
 
     int r1 = $1->outRegister;
     int r2 = $3->outRegister;
-    int r3 = generateRegister();
+    int r3 = generateRegister(globalVariableList);
 
     IlocOperation operation = generateBinaryOpWithOneOut(OP_DIV, r1, r2, r3);
     addOperationToIlocList(operationList, operation);
@@ -1275,7 +1252,7 @@ expression_grade_two: '-' expression_grade_one {
     IlocOperationList* operationList = createIlocListFromOtherList($2->operationList);
 
     int r1 = $2->outRegister;
-    int r2 = generateRegister();
+    int r2 = generateRegister(globalVariableList);
 
     IlocOperation operation = generateUnaryOpWithOneOut(OP_NEG, r1, r2);
     addOperationToIlocList(operationList, operation);
@@ -1298,13 +1275,13 @@ expression_grade_one: TK_IDENTIFICADOR {
     IlocOperationList* operationList = createIlocList();
 
     int address = symbol.position;
-    int r1 = generateRegister();
+    int r1 = generateRegister(globalVariableList);
 
     IlocOperation operation;
     
     if (symbol.isGlobal)
     {
-        operation = generateUnaryOpWithOneOut(OP_LOADAI_GLOBAL, address, r1);
+        operation = generateUnaryOpWithOneOutForGlobalVariable(OP_LOADAI_GLOBAL, symbol.lexicalValue.label, r1);
     }
     else
     {

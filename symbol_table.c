@@ -2,6 +2,7 @@
 
 extern Node* tree;
 extern SymbolTableStack* symbolTableStack;
+extern GlobalVariableList* globalVariableList;
 
 void initGlobalSymbolStack() 
 {
