@@ -1,10 +1,28 @@
-int main() {
+int goodbye() {
+    int a;
+    a = 2;
+    return a;
+}
+int hello() {
     int a;
     int b;
-    a = 0;
-    b = 10;
-    while (a <= b) {
-        a = a + 1;
+    int c;
+    a = 1;
+    b = 1;
+    c = 1;
+    return a + b + c;
+}
+int main(int a, int b, int c) {
+    int result;
+    int d;
+    a = hello();
+    b = hello();
+    c = goodbye();
+    d = 10;
+    if (a * b * c * d > 1000) then {
+        result = 1;
+    } else {
+        result = 2;
     };
-    return a;
+    return result;
 }

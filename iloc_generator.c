@@ -22,6 +22,7 @@ IlocOperation generate_empty_operation()
     operation.label = -1;
     operation.functionLabel = NULL;
     operation.globalVariable = NULL;
+    operation.rspSub = 0;
     operation.op1 = -1;
     operation.op2 = -1;
     operation.out1 = -1;
@@ -58,6 +59,15 @@ IlocOperation generateFunctionNop(char* functioLabel)
         operation.isMain = 1;
     }  
 
+    return operation;
+}
+
+IlocOperation generateFunctionCall(char* functioLabel)
+{
+    IlocOperation operation = generate_empty_operation();
+    operation.type = OP_CALL;
+    operation.functionLabel = malloc(strlen(functioLabel) + 1);
+    strcpy(operation.functionLabel, functioLabel);
     return operation;
 }
 
@@ -128,11 +138,21 @@ IlocOperation generateUnaryOpWithoutOut(IlocOperationType type, int op)
     return operation;
 }
 
+IlocOperation generateUnaryOpWithoutInput(IlocOperationType type, int out1)
+{
+    IlocOperation operation = generate_empty_operation();
+    operation.type = type;
+    operation.out1 = out1;
+    return operation;
+}
+
 IlocOperation addLabelToOperation(IlocOperation operation, int label)
 {
     operation.label = label;   
     return operation;
 }
+
+
 
 void convertOperationWithLabel(IlocOperation operation) 
 {
@@ -153,6 +173,7 @@ void convertOperationWithLabel(IlocOperation operation)
     {
         printf("    pushq   %s \n", "%rbp");
         printf("    movq    %s \n", "%rsp, %rbp");
+        printf("    subq    $%d, %s \n", operation.rspSub, "%rsp");
     }
 }
 
@@ -163,118 +184,112 @@ void convertOperationToCode(IlocOperation operation)
     }
     switch (operation.type)
     {  
-        case OP_LOADAI_GLOBAL: // Done
+        case OP_LOADAI_GLOBAL:
             printf("    movl    _%s(%s), %s \n", operation.globalVariable, "%rip", "%eax");
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
-        case OP_LOADAI_LOCAL: // Done
+        case OP_LOADAI_LOCAL:
             printf("    movl    -%d(%s), %s \n", operation.op1, "%rbp", "%eax");
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
-        case OP_LOADI: // Done
+        case OP_LOADI:
             printf("    movl    $%d, _temp_r_%d(%s) \n", operation.op1, operation.out1, "%rip");
             break;
-        case OP_STOREAI_GLOBAL: // Done
+        case OP_STOREAI_GLOBAL:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.out1, "%rip", "%eax");
             printf("    movl    %s, _%s(%s) \n", "%eax", operation.globalVariable, "%rip");
             break;
-        case OP_STOREAI_LOCAL: // Done
+        case OP_STOREAI_LOCAL:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    movl    %s, -%d(%s) \n", "%eax", operation.out1, "%rbp");
             break;
-        case OP_LOAD_FUNCTION_RETURN:  // Done
+        case OP_LOAD_FUNCTION_RETURN:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             break;
-        case OP_RETURN: // Done
-            printf("    popq	%s \n", "%rbp");
-            printf("    ret \n"); 
+        case OP_RETURN:
+            printf("    leave \n");
+            printf("    ret \n");             
             break;
-        case OP_ADD: // Done
+        case OP_ADD:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%edx");
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    addl    %s, %s \n",  "%edx", "%eax");
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
-        case OP_SUB: // Done
+        case OP_SUB:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    subl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
-        case OP_MULT: // Done
+        case OP_MULT:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    imull   _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
-        case OP_DIV: // Done
+        case OP_DIV:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    cltd \n");
             printf("    idivl	_temp_r_%d(%s) \n", operation.op2, "%rip");
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
-        case OP_NEG: // Done
+        case OP_NEG:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    negl	%s \n", "%eax");
             printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
-        case OP_CMP_GE: // Done
+        case OP_CMP_GE:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    jle     L%d \n", operation.out1);
             break;
-        case OP_JUMPI: // Done
+        case OP_JUMPI:
             printf("    jmp     L%d \n", operation.op1);
             break;
-        case OP_CMP_NE: // Done
+        case OP_CMP_NE:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    je      L%d \n", operation.out1);
             break;
-        case OP_CMP_LE: // Done
+        case OP_CMP_LE:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    jg      L%d \n", operation.out1);
             break;
-        case OP_CMP_LT: // Done
+        case OP_CMP_LT:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    jge     L%d \n", operation.out1);
             break;
-        case OP_CMP_GT: // Done
+        case OP_CMP_GT:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    jle     L%d \n", operation.out1);
             break;
-        case OP_CMP_EQ: // Done
+        case OP_CMP_EQ:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             printf("    cmpl    _temp_r_%d(%s), %s \n", operation.op2, "%rip", "%eax");
             printf("    jne     L%d \n", operation.out1);            
             break;
-        case OP_AND: // Done
+        case OP_AND:
             printf("    cmpl   $0, _temp_r_%d(%s) \n", operation.op1, "%rip");
             printf("    je     L%d \n", operation.out1);    
             printf("    cmpl   $0, _temp_r_%d(%s) \n", operation.op2, "%rip");
             printf("    je     L%d \n", operation.out1);   
             break;
-        case OP_OR: // Done
+        case OP_OR:
             printf("    cmpl   $0, _temp_r_%d(%s) \n", operation.op1, "%rip");
             printf("    jne     L%d \n", operation.out1);    
             printf("    cmpl   $0, _temp_r_%d(%s) \n", operation.op2, "%rip");
             printf("    je     L%d \n", operation.out2);
             break;
-        case OP_ADD_TO_STACK_POINTER:
-            printf("    add r0, r%d => r0 \n", operation.op1);
+        case OP_ERASE_RETURN:
+            printf("    movl	$0, %s \n", "%eax");
             break;
-        case OP_LOADI_TO_STACK_POINTER:
-            printf("    addI r%d, 0 => r0 \n", operation.op1);
+        case OP_CALL:
+            printf("    call	_%s \n", operation.functionLabel);
             break;
-        case OP_LOAD_RFP_TO_STACK_POINTER:
-            printf("    addI rfp, 0 => r0 \n");
-            break;
-        case OP_LOAD_STACK_POINTER:
-            printf("    addI r0, 0 => r%d \n", operation.op1);
-            break;
-        case OP_LOAD_PC:
-            printf("    addI rpc, 0 => r%d \n", operation.op1);
+        case OP_READ_RETURN:
+            printf("    movl    %s, _temp_r_%d(%s) \n", "%eax", operation.out1, "%rip");
             break;
         default:
             break;
