@@ -178,10 +178,14 @@ void convertOperationWithLabel(IlocOperation operation)
 {
     if (operation.isMain) 
     {
+        printf("    .text \n");
+        printf("    .globl _main \n");
         printf("_main: \n");
     } 
     else if (operation.isFunction)
     {
+        printf("    .text \n");
+        printf("    .globl _%s \n", operation.functionLabel);
         printf("_%s: \n", operation.functionLabel);
     } 
     else 
@@ -341,13 +345,16 @@ void generateGlobalDeclarationCodeForInteger(GlobalVariableList* globalVariableL
     if (lexicalValue.type == TOKEN_TYPE_TEMPORARY) 
     {
         printf("    .globl _temp_r_%d \n", lexicalValue.lineNumber);
-        printf("    .zerofill __DATA,__common,_temp_r_%d,4,2 \n", lexicalValue.lineNumber);
+        printf("    .data \n");
+        printf("_temp_r_%d: \n", lexicalValue.lineNumber);
     }
     else 
     {
         printf("    .globl _%s \n", lexicalValue.label);
-        printf("    .zerofill __DATA,__common,_%s,4,2 \n", lexicalValue.label);
+        printf("    .data \n");
+        printf("_%s: \n", lexicalValue.label);
     }
+    printf("    .int   4 \n");
 }
 
 void generateGlobalDeclarationCodeForFunction(GlobalVariableList* globalVariableList)
@@ -369,7 +376,7 @@ void generateGlobalDeclarationCode(GlobalVariableList* globalVariableList)
         } 
         else if (currentGlobalVariable->dataType == DATA_TYPE_FUNCTION) 
         {
-            generateGlobalDeclarationCodeForFunction(currentGlobalVariable);
+            // generateGlobalDeclarationCodeForFunction(currentGlobalVariable);
         }
         currentGlobalVariable = currentGlobalVariable->nextItem;
     }

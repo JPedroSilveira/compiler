@@ -1,8 +1,13 @@
-int reflect(int a, int b, int c, int d, int e, int f) {
-    return a;
+int a;
+int div(int a, int b) {
+    return a / b;
+}
+int multiply(int a, int b, int c) {
+    return a * b * c;
 }
 int main() {
     int result;
-    result = reflect(1, 2, 3, 4, 5, 6);
-    return result;
+    result = multiply(2, 2, 2);
+    a = div(result, 2);
+    return a;
 }
