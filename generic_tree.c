@@ -26,8 +26,6 @@ Node* createNodeForFunctionCall(LexicalValue lexicalValue)
     strcpy(newLabel, prefix);
     strcat(newLabel, node->lexicalValue.label);
 
-    free(node->lexicalValue.label);
-
     node->lexicalValue.label = newLabel;
 
     return node;

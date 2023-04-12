@@ -150,6 +150,7 @@ typedef enum IlocOperationType {
     OP_STOREAI_LOCAL,
     OP_ERASE_RETURN,
     OP_CALL,
+    OP_LEAVE,
     OP_READ_RETURN,
     OP_ADD_ARG_TO_CALL,
     OP_READ_ARG_FROM_CALL,
@@ -186,5 +187,12 @@ typedef struct GlobalVariableList {
     LexicalValue lexicalValue;
     struct GlobalVariableList* nextItem;
 } GlobalVariableList;
+
+typedef struct FunctionList {
+    LexicalValue lexicalValue;
+    struct IlocOperationList* operationList;
+    struct FunctionList* nextItem;
+    int isEmpty;
+} FunctionList;
 
 #endif

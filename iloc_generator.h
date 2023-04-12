@@ -7,6 +7,8 @@
 #include "types.h"
 #include "print.h"
 #include "lexical_value.h"
+#include "errors.h"
+#include "free.h"
 
 int generateLabel();
 int generateRegister(GlobalVariableList* globalVariableList);
@@ -23,7 +25,7 @@ IlocOperation generateUnaryOpWithTwoOuts(IlocOperationType type, int op, int out
 IlocOperation generateUnaryOpWithoutOut(IlocOperationType type, int op);
 IlocOperation generateUnaryOpWithoutInput(IlocOperationType type, int out1);
 IlocOperation addLabelToOperation(IlocOperation operation, int label);
-void generateCode(IlocOperationList* operationList);
+void generateCode(IlocOperationList* operationList, int shouldOptimize);
 void generateGlobalDeclarationCode(GlobalVariableList* globalVariableList);
 IlocOperationList* createIlocList();
 IlocOperationList* createIlocListFromOtherList(IlocOperationList* operationList);
@@ -34,5 +36,9 @@ FunctionCallArgument* createFunctionCallArgument(int value);
 FunctionCallArgument* addFunctionCallArgument(FunctionCallArgument* functionCallArgument, int value);
 GlobalVariableList* createGlobalVariableList();
 void addVariableToGlobalVariableList(GlobalVariableList* globalVariableList, LexicalValue lexicalValue, DataType dataType);
+FunctionList* createEmptyFunctionList();
+FunctionList* createFunctionList(LexicalValue lexicalValue, IlocOperationList* operationList);
+void addFunctionToFunctionList(FunctionList* functionList, LexicalValue lexicalValue, IlocOperationList* operationList);
+IlocOperationList* getFunctionCodeByLexicalValue(FunctionList* functionList, LexicalValue lexicalValue);
 
 #endif

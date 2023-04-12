@@ -17,6 +17,8 @@ int get_line_number();
 extern Node* tree;
 extern SymbolTableStack* symbolTableStack;
 extern GlobalVariableList* globalVariableList;
+extern FunctionList* functionList;
+extern int shouldOptimize;
 %}
 
 %code requires {
@@ -280,10 +282,24 @@ dimension: TK_LIT_INT '^' dimension {
 // =======================
 function: header body {
     $$ = $1;
-    addChild($$, $2);
+    addChild($$, $2);    
     if ($2) {
         addIlocListToIlocList($$->operationList, $2->operationList);
         updateFunctionLastPosition(symbolTableStack, $$->lexicalValue, $2->lastPosition);
+    }
+    if (shouldOptimize && strcmp($$->lexicalValue.label, "main"))
+    {    
+        IlocOperation leaveOperation = generateUnaryOp(OP_LEAVE);
+        addOperationToIlocList($$->operationList, leaveOperation);
+        addFunctionToFunctionList(functionList, $$->lexicalValue, $$->operationList);
+        $$->operationList = createIlocList();
+    }
+    else
+    {
+        IlocOperation leaveOperation = generateUnaryOp(OP_LEAVE);
+        addOperationToIlocList($$->operationList, leaveOperation);
+        IlocOperation returnOperation = generateUnaryOp(OP_RETURN);
+        addOperationToIlocList($$->operationList, returnOperation);
     }
 };
 
@@ -301,7 +317,7 @@ header: type function_name arguments {
 
     IlocOperation operationNop = generateFunctionNop($2.label);
     operationNop = addLabelToOperation(operationNop, functionLabel); 
-    operationNop.rspSub =  symbolTableStack->lastPosition;
+    operationNop.rspSub = symbolTableStack->lastPosition;
     addOperationToIlocList(operationList, operationNop);
 
     FunctionArgument* argument = $3;
@@ -313,7 +329,7 @@ header: type function_name arguments {
         argument = argument->nextArgument;
         argumentNumber = argumentNumber + 1;
     }
-    
+
     $$->operationList = operationList;
 };
 
@@ -545,13 +561,19 @@ function_call: TK_IDENTIFICADOR '(' ')' {
 
     IlocOperationList* operationList = createIlocList();
 
-    int functionLabel = symbol.lexicalValue.functionLabel;
-
     IlocOperation operationEraseReturn = generateUnaryOp(OP_ERASE_RETURN);
     addOperationToIlocList(operationList, operationEraseReturn);
 
-    IlocOperation operationCall = generateFunctionCall(symbol.lexicalValue.label);
-    addOperationToIlocList(operationList, operationCall);
+    if (shouldOptimize)
+    {
+        IlocOperationList* functionOperationList = getFunctionCodeByLexicalValue(functionList, $1);
+        addIlocListToIlocList(operationList, functionOperationList);
+    }
+    else
+    {
+        IlocOperation operationCall = generateFunctionCall(symbol.lexicalValue.label);
+        addOperationToIlocList(operationList, operationCall);
+    }
 
     IlocOperation operationReadReturnValue = generateUnaryOpWithoutInput(OP_READ_RETURN, r1);
     addOperationToIlocList(operationList, operationReadReturnValue);
@@ -588,8 +610,16 @@ function_call: TK_IDENTIFICADOR '(' arg_fn_list ')' {
     IlocOperation operationEraseReturn = generateUnaryOp(OP_ERASE_RETURN);
     addOperationToIlocList(operationList, operationEraseReturn);
 
-    IlocOperation operationCall = generateFunctionCall(symbol.lexicalValue.label);
-    addOperationToIlocList(operationList, operationCall);
+    if (shouldOptimize)
+    {
+        IlocOperationList* functionOperationList = getFunctionCodeByLexicalValue(functionList, $1);
+        addIlocListToIlocList(operationList, functionOperationList);
+    }
+    else
+    {
+        IlocOperation operationCall = generateFunctionCall(symbol.lexicalValue.label);
+        addOperationToIlocList(operationList, operationCall);
+    }
 
     IlocOperation operationReadReturnValue = generateUnaryOpWithoutInput(OP_READ_RETURN, r1);
     addOperationToIlocList(operationList, operationReadReturnValue);
@@ -622,9 +652,6 @@ return_command: TK_PR_RETURN expression {
 
     IlocOperation loadReturnOperation = generateUnaryOpWithoutOut(OP_LOAD_FUNCTION_RETURN, $2->outRegister);
     addOperationToIlocList(operationList, loadReturnOperation);
-
-    IlocOperation returnOperation = generateUnaryOp(OP_RETURN);
-    addOperationToIlocList(operationList, returnOperation);
 
     $$->operationList = operationList;
 };

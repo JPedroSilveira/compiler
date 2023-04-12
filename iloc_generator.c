@@ -174,7 +174,7 @@ char* getArgumentRegister(int argumentNumber)
     }
 }
 
-void convertOperationWithLabel(IlocOperation operation) 
+void convertOperationWithLabel(IlocOperation operation, int shouldOptimize) 
 {
     if (operation.isMain) 
     {
@@ -201,10 +201,10 @@ void convertOperationWithLabel(IlocOperation operation)
     }
 }
 
-void convertOperationToCode(IlocOperation operation) 
+void convertOperationToCode(IlocOperation operation, int shouldOptimize) 
 {
     if (operation.type != OP_INVALID && operation.label != -1) {
-        convertOperationWithLabel(operation);
+        convertOperationWithLabel(operation, shouldOptimize);
     }
     switch (operation.type)
     {  
@@ -230,9 +230,11 @@ void convertOperationToCode(IlocOperation operation)
         case OP_LOAD_FUNCTION_RETURN:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%eax");
             break;
-        case OP_RETURN:
+        case OP_LEAVE:
             printf("    leave \n");
-            printf("    ret \n");             
+            break;
+        case OP_RETURN:
+            printf("    ret \n");   
             break;
         case OP_ADD:
             printf("    movl    _temp_r_%d(%s), %s \n", operation.op1, "%rip", "%edx");
@@ -326,14 +328,14 @@ void convertOperationToCode(IlocOperation operation)
     }
 }
 
-void generateCode(IlocOperationList* operationList) 
+void generateCode(IlocOperationList* operationList, int shouldOptimize) 
 {
     IlocOperationList* nextOperation = operationList;
 
     while(nextOperation != NULL)
     {
         IlocOperation operation = nextOperation->operation;
-        convertOperationToCode(operation);
+        convertOperationToCode(operation, shouldOptimize);
         nextOperation = nextOperation->nextItem;
     }
 }
@@ -374,10 +376,6 @@ void generateGlobalDeclarationCode(GlobalVariableList* globalVariableList)
         {
             generateGlobalDeclarationCodeForInteger(currentGlobalVariable);
         } 
-        else if (currentGlobalVariable->dataType == DATA_TYPE_FUNCTION) 
-        {
-            // generateGlobalDeclarationCodeForFunction(currentGlobalVariable);
-        }
         currentGlobalVariable = currentGlobalVariable->nextItem;
     }
 }
@@ -525,3 +523,71 @@ void addVariableToGlobalVariableList(GlobalVariableList* globalVariableList, Lex
     lastGlobalVariable->dataType = dataType;
     lastGlobalVariable->nextItem = newGlobalVariable;
 }
+
+FunctionList* createEmptyFunctionList() 
+{
+    FunctionList* emptyItem = malloc(sizeof(FunctionList));
+    if (!emptyItem) 
+    {
+        printError("[FunctionList] Fail to create function list!");
+        return NULL;
+    }
+    emptyItem->operationList = NULL;
+    emptyItem->nextItem = NULL;
+    emptyItem->isEmpty = 1;
+    return emptyItem;
+}
+
+FunctionList* createFunctionList(LexicalValue lexicalValue, IlocOperationList* operationList) 
+{
+    FunctionList* newItem = malloc(sizeof(FunctionList));
+    if (!newItem) 
+    {
+        printError("[FunctionList] Fail to create function list!");
+        return NULL;
+    }
+    newItem->lexicalValue = lexicalValue;
+    newItem->operationList = operationList;
+    newItem->nextItem = NULL;
+    newItem->isEmpty = 0;
+    return newItem;
+}
+
+void addFunctionToFunctionList(FunctionList* functionList, LexicalValue lexicalValue, IlocOperationList* operationList)
+{
+    FunctionList* newItem = createFunctionList(lexicalValue, operationList);
+
+    FunctionList* lastItem = functionList;
+    if (lastItem->isEmpty) 
+    {
+        lastItem->lexicalValue = lexicalValue;
+        lastItem->operationList = operationList;
+        lastItem->isEmpty = 0;
+    }
+    else 
+    {
+        while(lastItem->nextItem)
+        {
+            lastItem = lastItem->nextItem;
+        }
+
+        lastItem->nextItem = newItem;
+    }
+}
+
+IlocOperationList* getFunctionCodeByLexicalValue(FunctionList* functionList, LexicalValue lexicalValue)
+{
+    FunctionList* currentFunction = functionList;
+    while(currentFunction)
+    {
+        if (strcmp(currentFunction->lexicalValue.label, lexicalValue.label) == 0)
+        {
+            return currentFunction->operationList;
+        }
+        currentFunction = currentFunction->nextItem;
+    }
+    printf("ERRO! Função %s não foi declarada antes do seu uso na linha %d", lexicalValue.label, lexicalValue.lineNumber);
+    freeGlobalVariables();
+    exit(ERR_UNDECLARED);
+}
+
