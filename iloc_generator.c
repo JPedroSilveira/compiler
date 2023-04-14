@@ -184,9 +184,11 @@ void convertOperationWithLabel(IlocOperation operation, int shouldOptimize)
     } 
     else if (operation.isFunction)
     {
-        printf("    .text \n");
-        printf("    .globl _%s \n", operation.functionLabel);
-        printf("_%s: \n", operation.functionLabel);
+        if (!shouldOptimize) {
+            printf("    .text \n");
+            printf("    .globl _%s \n", operation.functionLabel);
+            printf("_%s: \n", operation.functionLabel);
+        }
     } 
     else 
     {

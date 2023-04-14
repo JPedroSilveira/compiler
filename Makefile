@@ -17,4 +17,14 @@ scanner: scanner.l
 	$(COMPILER) lex.yy.c -c #gera lex.yy.o
 
 all: main scanner
-	$(COMPILER) lex.yy.o main.o -o etapa6
+	$(COMPILER) lex.yy.o main.o -o etapa7
+
+example1: main
+	./etapa7 -O < example1.c > program.s && gcc-12 program.s -o program_optimized
+	./etapa7 < example1.c > program.s && gcc-12 program.s -o program_default
+	python3 analise.py
+
+example2: main
+	./etapa7 -O < example2.c > program.s && gcc-12 program.s -o program_optimized
+	./etapa7 < example2.c > program.s && gcc-12 program.s -o program_default
+	python3 analise.py
